@@ -1,0 +1,89 @@
+#https://github.com/pdarshaniit/Project2_priyadarshan_biocomputing
+
+setwd("~/Project_folder")
+#TASK 1
+# a
+counts <- read.csv("airway_counts.csv", row.names = 1)
+samples <- read.csv("airway_samples.csv", row.names = 1)
+
+str(counts)
+samples
+str(samples)
+dim(counts)
+#counts(8genes X 63677 samples)
+
+#b
+mutate(samples, column lib_size = colSums(counts))
+
+samples %>% 
+group_by() %>% 
+summarize( mean_library_size = mean(column lib_size), 
+n = n() )
+
+#c
+library(ggplot2)
+ggplot(samples, aes(x = sample, y = library size)) + geom_col()
+
+labs( title = "Bar chart of library per sample")
+
+#TASK2 
+library(tximport)
+library(DESeq2)
+library(readr)
+library(Biostrings)
+
+#a
+
+colnames(samples)
+table(samples$group)
+
+rownames(samples) <- samples$run
+dds <- DESeqDataSetFromMatrix(countData = as.matrix(counts),
+colData = samples, design = ~ group)
+
+levels(dds$group)
+
+#c
+
+vsd <- vst(dds, blind = TRUE)
+dir.create("plots", showWarnings = FALSE)
+p_pca <- plotPCA(vsd, intgroup = "group")
+p_pca
+
+#PC1 variance is 41%
+#PC2 variance is 26%
+ggsave("plots/PCA.png", p_pca, width = 7, height = 5, dpi = 300)
+
+#TASK3
+
+#a
+dds <- DESeq(dds)
+
+write.csv(counts(dds, normalized = TRUE), "results/normalized_counts.csv", quote = FALSE)
+
+#b
+
+numerator <- "trt"
+denominator <- "untrt"
+comparison <- paste0(numerator, "_vs_", denominator)
+res <- results(dds, contrast = c("group", numerator, denominator))
+head(res)
+
+res <- res[order(res$padj), ]
+res_df <- as.data.frame(res)
+res_df$gene <- rownames(res_df)
+
+res_df$status <- "Not significant"
+res_df$status[res_df$padj < 0.05 & res_df$log2FoldChange >= 1] <- "Up"
+res_df$status[res_df$padj < 0.05 & res_df$log2FoldChange <= -1] <- "Down"
+table(res_df$status)
+#Up=476 and down = 401
+
+#c
+degs <- subset(res_df, status %in% c("Up", "Down"))
+nrow(degs)
+write.csv(res_df, paste0("results/", comparison, "_all_genes.csv"), row.names = FALSE)
+write.csv(degs, paste0("results/", comparison, "_DEGs.csv"), row.names = FALSE)
+
+deg_table <- read.csv(paste0("results/", comparison, "_DEGs.csv"))
+head(deg_table, 5)
